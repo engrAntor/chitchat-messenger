@@ -40,9 +40,7 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     try {
       const res = await authApi.login({ phone: data.phone, name: data.name });
-      const userId = res.user._id || (res.user as any).id || (res.user as any).userId;
-      const normalizedUser = { ...res.user, _id: userId };
-      setAuth(normalizedUser, res.token);
+      setAuth(res.user, res.token);
       document.cookie = `chat_token=${res.token}; path=/; max-age=86400; SameSite=Lax`;
       toast.success(`Welcome, ${res.user.name}!`);
       router.replace('/chat');

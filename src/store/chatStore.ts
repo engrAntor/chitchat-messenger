@@ -100,30 +100,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
   appendMessage: (conversationId, message) =>
     set((state) => {
       const existing = state.messages[conversationId] ?? [];
-      // Dedup: check both _id and id fields (server returns 'id' not '_id')
-      const msgId = message._id || (message as any).id;
-      if (msgId && existing.some((m) => (m._id || (m as any).id) === msgId)) return {};
-
-      // Normalise createdAt: server may return Unix timestamp (number) instead of ISO string
-      const createdAt = typeof message.createdAt === 'number'
-        ? new Date(message.createdAt).toISOString()
-        : (message.createdAt || new Date().toISOString());
-      const normalised = { ...message, _id: msgId || message._id, createdAt };
+      // Avoid duplicates by _id
+      if (existing.some((m) => m._id === message._id)) return {};
 
       // If this incoming message matches a pending optimistic message, replace it
       const optimisticIdx = existing.findIndex(
         (m) =>
           m.optimistic &&
           m.status === 'pending' &&
-          m.text === normalised.text
+          m.text === message.text
       );
 
       let updatedList: Message[];
       if (optimisticIdx !== -1) {
         updatedList = [...existing];
-        updatedList[optimisticIdx] = { ...normalised, status: 'sent', optimistic: false };
+        updatedList[optimisticIdx] = { ...message, status: 'sent', optimistic: false };
       } else {
-        updatedList = [...existing, normalised];
+        updatedList = [...existing, message];
       }
 
       // Insert and keep sorted oldest → newest
@@ -140,8 +133,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         const updatedConvos = [...state.conversations];
         updatedConvos[convoIndex] = {
           ...convo,
-          lastMessage: normalised,
-          updatedAt: normalised.createdAt || new Date().toISOString(),
+          lastMessage: message,
+          updatedAt: message.createdAt || new Date().toISOString(),
         };
         updatedConvos.sort(
           (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()

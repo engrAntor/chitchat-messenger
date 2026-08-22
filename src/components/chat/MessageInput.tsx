@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSocketContext } from '@/components/providers/SocketProvider';
-import { getSocket } from '@/lib/socket';
 import { messagesApi } from '@/services/api';
 import { tempId } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -91,60 +90,42 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
 
     try {
       const realMsg = await messagesApi.send({ conversationId, text: optimisticMsg.text });
-      const convo = conversations.find((c) => c._id === conversationId);
       
-      // Server returns 'sender' as a plain string ID — expand it to full user object
       const senderObj = (typeof realMsg.sender === 'object' && realMsg.sender?._id)
         ? realMsg.sender
         : { _id: user._id, name: user.name, phone: user.phone };
 
-      // Server returns 'id' (not '_id') and 'conversation' (not 'conversationId')
-      const realId = (realMsg as any)._id || (realMsg as any).id;
-      const realConvId = (realMsg as any).conversationId
-        || (realMsg as any).conversation
-        || conversationId;
-
       const formattedRealMsg = {
         ...realMsg,
-        _id: realId,
-        conversationId: realConvId,
+        conversationId: realMsg.conversationId || conversationId,
         sender: senderObj,
         status: 'sent' as const,
       };
 
-      // Replace the optimistic placeholder with the real confirmed message
       replaceOptimisticMessage(conversationId, id, formattedRealMsg);
 
-      // Update conversation sidebar with latest message
-      if (convo) {
-        upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
+      if (socket) {
+        socket.emit('newMessage', formattedRealMsg);
+        socket.emit('new message', formattedRealMsg);
+        socket.emit('new_message', formattedRealMsg);
+        socket.emit('sendMessage', formattedRealMsg);
+        socket.emit('send_message', formattedRealMsg);
+        socket.emit('send message', formattedRealMsg);
+        socket.emit('message', formattedRealMsg);
+        socket.emit('chat message', formattedRealMsg);
+        socket.emit('chat:message', formattedRealMsg);
+        // Also emit with conversationId / room wrappers
+        socket.emit('newMessage', { conversationId, message: formattedRealMsg });
+        socket.emit('new message', { conversationId, message: formattedRealMsg });
+        socket.emit('sendMessage', { conversationId, message: formattedRealMsg });
+        socket.emit('send_message', { conversationId, message: formattedRealMsg });
+        socket.emit('message', { room: conversationId, message: formattedRealMsg });
       }
 
-      // Emit socket events so the backend broadcasts message:new to the other user
-      const activeSocket = socket || getSocket();
-      if (activeSocket) {
-        const myUserId = user._id || (user as any).id;
-        const socketPayload = {
-          id: realId,
-          _id: realId,
-          conversation: realConvId,
-          conversationId: realConvId,
-          chat: realConvId,
-          sender: myUserId,
-          text: optimisticMsg.text,
-          createdAt: Date.now(),
-        };
-
-        activeSocket.emit('message:new', socketPayload);
-        activeSocket.emit('message', socketPayload);
-        activeSocket.emit('newMessage', socketPayload);
-        activeSocket.emit('new_message', socketPayload);
-        activeSocket.emit('new message', socketPayload);
-        activeSocket.emit('sendMessage', socketPayload);
-        activeSocket.emit('send_message', socketPayload);
-        activeSocket.emit('chat:message', socketPayload);
-        activeSocket.emit('chat message', socketPayload);
-        activeSocket.emit('msg', socketPayload);
+      // Update conversation lastMessage
+      const convo = conversations.find((c) => c._id === conversationId);
+      if (convo) {
+        upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
       }
     } catch {
       markMessageFailed(conversationId, id);

@@ -18,8 +18,7 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
     const validate = async () => {
       try {
         const user = await authApi.me();
-        const userId = user._id || (user as any).id || (user as any).userId;
-        setAuth({ ...user, _id: userId }, token);
+        setAuth(user, token);
         // Set cookie for middleware
         document.cookie = `chat_token=${token}; path=/; max-age=86400; SameSite=Lax`;
       } catch {

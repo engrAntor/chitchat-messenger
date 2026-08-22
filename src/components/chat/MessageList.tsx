@@ -16,21 +16,6 @@ interface MessageListProps {
 
 export default function MessageList({ conversationId }: MessageListProps) {
   const { user } = useAuthStore();
-
-  // Robust user ID that works even before Zustand store hydration on production
-  const getMyId = (): string => {
-    if (user?._id) return user._id;
-    if ((user as any)?.id) return (user as any).id;
-    try {
-      const raw = localStorage.getItem('chat_user');
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p?._id) return p._id;
-        if (p?.id) return p.id;
-      }
-    } catch { /* ignore */ }
-    return '';
-  };
   const {
     messages,
     messagesStatus,
@@ -222,21 +207,38 @@ export default function MessageList({ conversationId }: MessageListProps) {
 
         {/* Messages */}
         {msgs.map((msg, idx) => {
-          const getId = (val: any): string => {
-            if (!val) return '';
-            if (typeof val === 'string') return val;
-            return val._id || val.id || val.userId || val.senderId || '';
-          };
+          const currentId = user?._id || (user as any)?.id || (user as any)?.user?._id || '';
+          const currentPhone = user?.phone?.trim() || (user as any)?.user?.phone?.trim() || '';
 
-          const senderId = getId(msg.sender) || getId((msg as any).senderId) || getId((msg as any).userId);
-          const currentUserId = getMyId();
-          const isOwn = Boolean(currentUserId && senderId && String(senderId) === String(currentUserId));
+          const rawSender = msg.sender;
+          const senderId = typeof rawSender === 'string'
+            ? rawSender
+            : (rawSender?._id || (rawSender as any)?.id || (msg as any).senderId || (msg as any).userId || '');
+          
+          const senderPhone = (typeof rawSender === 'object' ? rawSender?.phone?.trim() : null) || (msg as any).phone?.trim();
+
+          // Check if message belongs to current user by ID, Phone, or Optimistic flag
+          let isOwn = false;
+          if (msg.optimistic) {
+            isOwn = true;
+          } else if (currentId && senderId && String(senderId) === String(currentId)) {
+            isOwn = true;
+          } else if (currentPhone && senderPhone && currentPhone === senderPhone) {
+            isOwn = true;
+          } else if (currentPhone && senderId && conversation?.participants) {
+            const part = conversation.participants.find(
+              (p) => (p._id && String(p._id) === String(senderId)) || ((p as any).id && String((p as any).id) === String(senderId))
+            );
+            if (part?.phone && part.phone.trim() === currentPhone) {
+              isOwn = true;
+            }
+          }
           
           const prevMsg = msgs[idx - 1];
-          const prevSenderId = prevMsg ? (getId(prevMsg.sender) || getId((prevMsg as any).senderId)) : null;
+          const prevSenderId = prevMsg ? (typeof prevMsg.sender === 'string' ? prevMsg.sender : (prevMsg.sender?._id || (prevMsg.sender as any)?.id)) : null;
           
           const nextMsg = msgs[idx + 1];
-          const nextSenderId = nextMsg ? (getId(nextMsg.sender) || getId((nextMsg as any).senderId)) : null;
+          const nextSenderId = nextMsg ? (typeof nextMsg.sender === 'string' ? nextMsg.sender : (nextMsg.sender?._id || (nextMsg.sender as any)?.id)) : null;
 
           const showDateSep = idx === 0 || (prevMsg && isDifferentDay(prevMsg.createdAt, msg.createdAt));
           const showAvatar = !isOwn && (idx === msgs.length - 1 || nextSenderId !== senderId);
@@ -310,45 +312,38 @@ function MessageBubble({
   const isFailed = message.status === 'failed';
   const isPending = message.status === 'pending';
 
-  const getId = (val: any): string => {
-    if (!val) return '';
-    if (typeof val === 'string') return val;
-    return val._id || val.id || val.userId || val.senderId || '';
-  };
+  const currentId = user?._id || (user as any)?.id || (user as any)?.user?._id || '';
+  const currentPhone = user?.phone?.trim() || (user as any)?.user?.phone?.trim() || '';
 
-  // Robust current user ID with localStorage fallback for production SSR hydration timing
-  const myId = (() => {
-    if (user?._id) return user._id;
-    if ((user as any)?.id) return (user as any).id;
-    try {
-      const raw = localStorage.getItem('chat_user');
-      if (raw) {
-        const p = JSON.parse(raw);
-        if (p?._id) return p._id;
-        if (p?.id) return p.id;
-      }
-    } catch { /* ignore */ }
-    return '';
-  })();
+  const rawSender = message.sender;
+  const senderId = typeof rawSender === 'string'
+    ? rawSender
+    : (rawSender?._id || (rawSender as any)?.id || (message as any).senderId || (message as any).userId || '');
 
-  const senderId = getId(message.sender) || getId((message as any).senderId) || getId((message as any).userId);
-
-  // Participant lookup
+  // Look up participant in conversation
   const participant = conversation?.participants?.find(
-    (p) => getId(p._id) === senderId || getId((p as any).id) === senderId
+    (p) =>
+      (p._id && String(p._id) === String(senderId)) ||
+      ((p as any).id && String((p as any).id) === String(senderId)) ||
+      (p.phone && typeof rawSender === 'object' && rawSender?.phone && p.phone === rawSender.phone)
   );
 
+  // In direct chats, the other participant is the one who is NOT current user
   const otherParticipant = conversation?.type === 'direct'
-    ? conversation.participants?.find((p) => getId(p._id) !== myId) ?? (conversation as any)?.participant
+    ? conversation.participants?.find(
+        (p) =>
+          (currentId && p._id && String(p._id) !== String(currentId)) ||
+          (currentPhone && p.phone && p.phone.trim() !== currentPhone)
+      ) ?? (conversation as any)?.participant
     : null;
 
-  const rawName = typeof message.sender === 'object' ? message.sender?.name : undefined;
+  const rawName = typeof rawSender === 'object' ? rawSender?.name : undefined;
 
-  // Resolve sender name: check message object name, participant name from convo, or direct chat participant
+  // Resolve sender name
   const resolvedName =
     (rawName && rawName.trim() !== '' && rawName !== 'User')
       ? rawName
-      : participant?.name || (conversation?.type === 'direct' ? otherParticipant?.name : null) || (typeof message.sender === 'object' ? message.sender?.phone : null) || 'User';
+      : participant?.name || (conversation?.type === 'direct' ? otherParticipant?.name : null) || (typeof rawSender === 'object' ? rawSender?.phone : null) || 'User';
 
   const senderName = isOwn ? 'You' : resolvedName;
 

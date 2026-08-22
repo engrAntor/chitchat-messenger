@@ -6,24 +6,6 @@ import { useAuthStore } from '@/store/authStore';
 import { useChatStore } from '@/store/chatStore';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 
-// Helper: get current user ID at any point — works even before Zustand hydration
-function getCurrentUserId(): string {
-  // 1. Try Zustand store (fastest, always current)
-  const storeUser = useAuthStore.getState().user;
-  if (storeUser?._id) return storeUser._id;
-  if ((storeUser as any)?.id) return (storeUser as any).id;
-  // 2. Fallback to localStorage (works on production before store hydration)
-  try {
-    const raw = localStorage.getItem('chat_user');
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed?._id) return parsed._id;
-      if (parsed?.id) return parsed.id;
-    }
-  } catch { /* ignore */ }
-  return '';
-}
-
 interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
@@ -60,11 +42,19 @@ export default function SocketProvider({ children }: { children: React.ReactNode
     const socket = socketRef.current;
 
     const u = userRef.current;
-    if (u?._id) {
+    const uId = u?._id || (u as any)?.id || (u as any)?.user?._id;
+    if (uId) {
       socket.emit('setup', u);
-      socket.emit('join', u._id);
-      socket.emit('join_room', u._id);
-      socket.emit('addUser', u._id);
+      socket.emit('setup', { _id: uId, name: u?.name, phone: u?.phone });
+      socket.emit('setup', uId);
+      socket.emit('join', uId);
+      socket.emit('join_room', uId);
+      socket.emit('addUser', uId);
+      socket.emit('add_user', uId);
+    }
+    if (u?.phone) {
+      socket.emit('join', u.phone);
+      socket.emit('join_room', u.phone);
     }
 
     if (activeConversationId) {
@@ -100,11 +90,19 @@ export default function SocketProvider({ children }: { children: React.ReactNode
     const onConnect = () => {
       setIsConnected(true);
       const u = userRef.current;
-      if (u?._id) {
+      const uId = u?._id || (u as any)?.id || (u as any)?.user?._id;
+      if (uId) {
         socket.emit('setup', u);
-        socket.emit('join', u._id);
-        socket.emit('join_room', u._id);
-        socket.emit('addUser', u._id);
+        socket.emit('setup', { _id: uId, name: u?.name, phone: u?.phone });
+        socket.emit('setup', uId);
+        socket.emit('join', uId);
+        socket.emit('join_room', uId);
+        socket.emit('addUser', uId);
+        socket.emit('add_user', uId);
+      }
+      if (u?.phone) {
+        socket.emit('join', u.phone);
+        socket.emit('join_room', u.phone);
       }
       // Re-join active conversations
       const current = storeRef.current;
@@ -112,56 +110,42 @@ export default function SocketProvider({ children }: { children: React.ReactNode
         socket.emit('join', current.activeConversationId);
         socket.emit('join_room', current.activeConversationId);
         socket.emit('join chat', current.activeConversationId);
+        socket.emit('joinChat', current.activeConversationId);
+        socket.emit('joinConversation', current.activeConversationId);
       }
       current.conversations.forEach((c) => {
         if (c._id) {
           socket.emit('join', c._id);
           socket.emit('join_room', c._id);
           socket.emit('join chat', c._id);
+          socket.emit('joinChat', c._id);
+          socket.emit('joinConversation', c._id);
         }
       });
     };
 
     const onDisconnect = () => setIsConnected(false);
 
-    // ===== DEBUG: log every server event so we can identify exact event names =====
-    const onAnyDebug = (eventName: string, ...args: any[]) => {
-      console.log(`[SOCKET EVENT] "${eventName}"`, JSON.stringify(args[0]).slice(0, 300));
-    };
-    socket.onAny(onAnyDebug);
-    // ===== END DEBUG =====
-
-    // Incoming message handler — only processes messages from OTHER users
+    // Robust handler for any incoming message event
     const onMessage = (payload: any) => {
       if (!payload) return;
       const msg = payload.message ?? payload.data ?? payload;
       if (!msg || typeof msg !== 'object') return;
 
-      const getIdStr = (val: any): string => {
-        if (!val) return '';
-        if (typeof val === 'string') return val;
-        return val._id || val.id || val.conversationId || val.chatId || '';
-      };
-
       const convId =
-        getIdStr(msg.conversationId) ||
-        getIdStr(msg.conversation) ||
-        getIdStr(msg.chatId) ||
-        getIdStr(msg.chat) ||
-        getIdStr(msg.room) ||
-        getIdStr(msg.roomId) ||
-        getIdStr(msg.groupId);
+        msg.conversationId ??
+        (typeof msg.conversation === 'string' ? msg.conversation : msg.conversation?._id) ??
+        msg.chatId ??
+        (typeof msg.chat === 'string' ? msg.chat : msg.chat?._id) ??
+        msg.room ??
+        msg.roomId ??
+        msg.groupId;
 
       if (!convId) return;
 
       const senderId = typeof msg.sender === 'string'
         ? msg.sender
-        : (msg.sender?._id || (msg.sender as any)?.id || msg.senderId || '');
-
-      // *** KEY FIX: Ignore messages sent by the current user — already in store ***
-      // Read from store.getState() + localStorage fallback to handle production SSR hydration delay
-      const currentUserId = getCurrentUserId() || userRef.current?._id || '';
-      if (currentUserId && senderId && String(senderId) === String(currentUserId)) return;
+        : (msg.sender?._id || (msg.sender as any)?.id || msg.senderId || 'unknown');
 
       const foundConvo = storeRef.current.conversations.find((c) => c._id === convId);
       const participant = foundConvo?.participants?.find(
@@ -182,15 +166,11 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
       const normalized = {
         ...msg,
-        // Server returns 'id' not '_id'
-        _id: msg._id || msg.id || `incoming-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        _id: msg._id || msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         conversationId: convId,
         sender,
         text: msg.text ?? msg.content ?? msg.message ?? '',
-        // Server returns Unix timestamp number — convert to ISO string
-        createdAt: typeof msg.createdAt === 'number'
-          ? new Date(msg.createdAt).toISOString()
-          : (msg.createdAt || new Date().toISOString()),
+        createdAt: msg.createdAt || new Date().toISOString(),
         status: 'sent',
       };
 
@@ -265,11 +245,38 @@ export default function SocketProvider({ children }: { children: React.ReactNode
     ];
     convoEvents.forEach((ev) => socket.on(ev, onConversation));
 
+    // Catch-all fallback via onAny to handle any custom event name from backend
+    const onAnyEvent = (eventName: string, ...args: any[]) => {
+      const payload = args[0];
+      if (!payload) return;
+      const evLower = eventName.toLowerCase();
+      if (
+        evLower.includes('message') ||
+        evLower.includes('chat') ||
+        evLower.includes('msg') ||
+        payload.text ||
+        payload.content ||
+        payload.message?.text ||
+        payload.message?.content
+      ) {
+        onMessage(payload);
+      } else if (
+        evLower.includes('conversation') ||
+        payload.conversation ||
+        (payload.participants && Array.isArray(payload.participants))
+      ) {
+        onConversation(payload);
+      }
+    };
+
+    socket.onAny(onAnyEvent);
+
     if (socket.connected) onConnect();
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
+      socket.offAny(onAnyEvent);
       msgEvents.forEach((ev) => socket.off(ev, onMessage));
       convoEvents.forEach((ev) => socket.off(ev, onConversation));
     };

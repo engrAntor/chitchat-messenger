@@ -17,7 +17,13 @@ export const useAuthStore = create<AuthState>()(
       user: null,
       token: null,
       isHydrated: false,
-      setAuth: (user, token) => {
+      setAuth: (rawUser, token) => {
+        const user = rawUser
+          ? {
+              ...rawUser,
+              _id: rawUser._id || (rawUser as any).id,
+            }
+          : null;
         // Also keep in localStorage for Axios interceptor (server-side read)
         if (typeof window !== 'undefined') {
           localStorage.setItem('chat_token', token);

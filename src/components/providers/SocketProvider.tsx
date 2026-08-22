@@ -11,12 +11,14 @@ function getCurrentUserId(): string {
   // 1. Try Zustand store (fastest, always current)
   const storeUser = useAuthStore.getState().user;
   if (storeUser?._id) return storeUser._id;
+  if ((storeUser as any)?.id) return (storeUser as any).id;
   // 2. Fallback to localStorage (works on production before store hydration)
   try {
     const raw = localStorage.getItem('chat_user');
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed?._id) return parsed._id;
+      if (parsed?.id) return parsed.id;
     }
   } catch { /* ignore */ }
   return '';

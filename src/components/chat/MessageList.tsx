@@ -20,9 +20,14 @@ export default function MessageList({ conversationId }: MessageListProps) {
   // Robust user ID that works even before Zustand store hydration on production
   const getMyId = (): string => {
     if (user?._id) return user._id;
+    if ((user as any)?.id) return (user as any).id;
     try {
       const raw = localStorage.getItem('chat_user');
-      if (raw) { const p = JSON.parse(raw); if (p?._id) return p._id; }
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p?._id) return p._id;
+        if (p?.id) return p.id;
+      }
     } catch { /* ignore */ }
     return '';
   };
@@ -314,9 +319,14 @@ function MessageBubble({
   // Robust current user ID with localStorage fallback for production SSR hydration timing
   const myId = (() => {
     if (user?._id) return user._id;
+    if ((user as any)?.id) return (user as any).id;
     try {
       const raw = localStorage.getItem('chat_user');
-      if (raw) { const p = JSON.parse(raw); if (p?._id) return p._id; }
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p?._id) return p._id;
+        if (p?.id) return p.id;
+      }
     } catch { /* ignore */ }
     return '';
   })();

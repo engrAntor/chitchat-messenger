@@ -154,12 +154,21 @@ export default function SocketProvider({ children }: { children: React.ReactNode
         status: 'sent',
       };
 
-      const { appendMessage, activeConversationId, incrementUnread } = storeRef.current;
+      const { appendMessage, activeConversationId, incrementUnread, conversations } = storeRef.current;
 
       appendMessage(convId, normalized);
 
       if (convId !== activeConversationId) {
         incrementUnread(convId);
+      }
+
+      // If conversation is missing from current store, fetch updated list
+      if (!conversations.some((c) => c._id === convId)) {
+        import('@/services/api').then(({ conversationsApi }) => {
+          conversationsApi.list().then((list) => {
+            storeRef.current.setConversations(list);
+          }).catch(() => {});
+        });
       }
     };
 
@@ -169,6 +178,11 @@ export default function SocketProvider({ children }: { children: React.ReactNode
       const convo = payload.conversation ?? payload.data ?? payload;
       if (!convo?._id) return;
       storeRef.current.upsertConversation(convo);
+      if (socketRef.current) {
+        socketRef.current.emit('join', convo._id);
+        socketRef.current.emit('join_room', convo._id);
+        socketRef.current.emit('join chat', convo._id);
+      }
     };
 
     socket.on('connect', onConnect);

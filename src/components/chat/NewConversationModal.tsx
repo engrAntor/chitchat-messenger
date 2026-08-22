@@ -8,6 +8,7 @@ import Button from '@/components/ui/Button';
 import Spinner from '@/components/ui/Spinner';
 import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSocketContext } from '@/components/providers/SocketProvider';
 import { usersApi, conversationsApi } from '@/services/api';
 import { SearchResult } from '@/types';
 import { toast } from 'sonner';
@@ -23,6 +24,7 @@ interface NewConversationModalProps {
 export default function NewConversationModal({ open, onClose }: NewConversationModalProps) {
   const { user } = useAuthStore();
   const { upsertConversation, setActiveConversation, clearUnread } = useChatStore();
+  const { socket } = useSocketContext();
 
   const [mode, setMode] = useState<Mode>('search');
   const [query, setQuery] = useState('');
@@ -80,6 +82,16 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
       upsertConversation(convo);
       setActiveConversation(convo._id);
       clearUnread(convo._id);
+
+      if (socket) {
+        socket.emit('join', convo._id);
+        socket.emit('join_room', convo._id);
+        socket.emit('join chat', convo._id);
+        socket.emit('newConversation', convo);
+        socket.emit('new_conversation', convo);
+        socket.emit('conversation:new', convo);
+      }
+
       onClose();
     } catch {
       toast.error('Failed to start conversation');
@@ -106,6 +118,16 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
       upsertConversation(convo);
       setActiveConversation(convo._id);
       clearUnread(convo._id);
+
+      if (socket) {
+        socket.emit('join', convo._id);
+        socket.emit('join_room', convo._id);
+        socket.emit('join chat', convo._id);
+        socket.emit('newConversation', convo);
+        socket.emit('new_conversation', convo);
+        socket.emit('conversation:new', convo);
+      }
+
       toast.success(`Group "${groupName}" created!`);
       onClose();
     } catch {

@@ -291,29 +291,34 @@ function MessageBubble({
   isGrouped: boolean;
   conversation?: import('@/types').Conversation;
 }) {
+  const { user } = useAuthStore();
   const isFailed = message.status === 'failed';
   const isPending = message.status === 'pending';
-  
-  const senderId = typeof message.sender === 'string'
-    ? message.sender
-    : (message.sender?._id || (message.sender as any)?.id || 'unknown');
 
-  // Look up participant in conversation
+  const getId = (val: any): string => {
+    if (!val) return '';
+    if (typeof val === 'string') return val;
+    return val._id || val.id || val.userId || val.senderId || '';
+  };
+
+  const senderId = getId(message.sender) || getId((message as any).senderId) || getId((message as any).userId);
+
+  // Participant lookup
   const participant = conversation?.participants?.find(
-    (p) => p._id === senderId || (p as any).id === senderId
-  ) ?? (conversation as any)?.participant;
+    (p) => getId(p._id) === senderId || getId((p as any).id) === senderId
+  );
+
+  const otherParticipant = conversation?.type === 'direct'
+    ? conversation.participants?.find((p) => getId(p._id) !== getId(user?._id)) ?? (conversation as any)?.participant
+    : null;
 
   const rawName = typeof message.sender === 'object' ? message.sender?.name : undefined;
 
   // Resolve sender name: check message object name, participant name from convo, or direct chat participant
-  const otherParticipant = conversation?.type === 'direct'
-    ? conversation.participants?.find((p) => p._id === senderId) ?? (conversation as any)?.participant
-    : null;
-
   const resolvedName =
     (rawName && rawName.trim() !== '' && rawName !== 'User')
       ? rawName
-      : participant?.name || otherParticipant?.name || (typeof message.sender === 'object' ? message.sender?.phone : null) || 'User';
+      : participant?.name || (conversation?.type === 'direct' ? otherParticipant?.name : null) || (typeof message.sender === 'object' ? message.sender?.phone : null) || 'User';
 
   const senderName = isOwn ? 'You' : resolvedName;
 

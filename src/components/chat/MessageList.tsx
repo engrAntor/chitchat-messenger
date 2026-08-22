@@ -16,6 +16,16 @@ interface MessageListProps {
 
 export default function MessageList({ conversationId }: MessageListProps) {
   const { user } = useAuthStore();
+
+  // Robust user ID that works even before Zustand store hydration on production
+  const getMyId = (): string => {
+    if (user?._id) return user._id;
+    try {
+      const raw = localStorage.getItem('chat_user');
+      if (raw) { const p = JSON.parse(raw); if (p?._id) return p._id; }
+    } catch { /* ignore */ }
+    return '';
+  };
   const {
     messages,
     messagesStatus,
@@ -214,7 +224,7 @@ export default function MessageList({ conversationId }: MessageListProps) {
           };
 
           const senderId = getId(msg.sender) || getId((msg as any).senderId) || getId((msg as any).userId);
-          const currentUserId = getId(user?._id) || getId((user as any)?.id);
+          const currentUserId = getMyId();
           const isOwn = Boolean(currentUserId && senderId && String(senderId) === String(currentUserId));
           
           const prevMsg = msgs[idx - 1];
@@ -301,6 +311,16 @@ function MessageBubble({
     return val._id || val.id || val.userId || val.senderId || '';
   };
 
+  // Robust current user ID with localStorage fallback for production SSR hydration timing
+  const myId = (() => {
+    if (user?._id) return user._id;
+    try {
+      const raw = localStorage.getItem('chat_user');
+      if (raw) { const p = JSON.parse(raw); if (p?._id) return p._id; }
+    } catch { /* ignore */ }
+    return '';
+  })();
+
   const senderId = getId(message.sender) || getId((message as any).senderId) || getId((message as any).userId);
 
   // Participant lookup
@@ -309,7 +329,7 @@ function MessageBubble({
   );
 
   const otherParticipant = conversation?.type === 'direct'
-    ? conversation.participants?.find((p) => getId(p._id) !== getId(user?._id)) ?? (conversation as any)?.participant
+    ? conversation.participants?.find((p) => getId(p._id) !== myId) ?? (conversation as any)?.participant
     : null;
 
   const rawName = typeof message.sender === 'object' ? message.sender?.name : undefined;

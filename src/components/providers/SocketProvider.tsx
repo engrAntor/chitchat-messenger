@@ -6,6 +6,22 @@ import { useAuthStore } from '@/store/authStore';
 import { useChatStore } from '@/store/chatStore';
 import { connectSocket, disconnectSocket } from '@/lib/socket';
 
+// Helper: get current user ID at any point — works even before Zustand hydration
+function getCurrentUserId(): string {
+  // 1. Try Zustand store (fastest, always current)
+  const storeUser = useAuthStore.getState().user;
+  if (storeUser?._id) return storeUser._id;
+  // 2. Fallback to localStorage (works on production before store hydration)
+  try {
+    const raw = localStorage.getItem('chat_user');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?._id) return parsed._id;
+    }
+  } catch { /* ignore */ }
+  return '';
+}
+
 interface SocketContextValue {
   socket: Socket | null;
   isConnected: boolean;
@@ -106,6 +122,13 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
     const onDisconnect = () => setIsConnected(false);
 
+    // ===== DEBUG: log every server event so we can identify exact event names =====
+    const onAnyDebug = (eventName: string, ...args: any[]) => {
+      console.log(`[SOCKET EVENT] "${eventName}"`, JSON.stringify(args[0]).slice(0, 300));
+    };
+    socket.onAny(onAnyDebug);
+    // ===== END DEBUG =====
+
     // Incoming message handler — only processes messages from OTHER users
     const onMessage = (payload: any) => {
       if (!payload) return;
@@ -134,7 +157,8 @@ export default function SocketProvider({ children }: { children: React.ReactNode
         : (msg.sender?._id || (msg.sender as any)?.id || msg.senderId || '');
 
       // *** KEY FIX: Ignore messages sent by the current user — already in store ***
-      const currentUserId = userRef.current?._id || '';
+      // Read from store.getState() + localStorage fallback to handle production SSR hydration delay
+      const currentUserId = getCurrentUserId() || userRef.current?._id || '';
       if (currentUserId && senderId && String(senderId) === String(currentUserId)) return;
 
       const foundConvo = storeRef.current.conversations.find((c) => c._id === convId);

@@ -2,7 +2,7 @@
 
 > **Live Application**: [https://engr-antor-chat-app.netlify.app](https://engr-antor-chat-app.netlify.app)  
 > **API Documentation Specification**: [API_DOCUMENTATION.md](API_DOCUMENTATION.md)  
-> **Backend Base URL**: `https://frontend-task-chatapp.onrender.com`
+> 
 
 AltChat is a high-performance, enterprise-grade real-time web application built with **Next.js 16 (App Router)**, **TypeScript**, **Zustand**, **Tailwind CSS v4**, and **Socket.IO**. Designed for high responsiveness, visual polish, and production reliability.
 

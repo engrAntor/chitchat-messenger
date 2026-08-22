@@ -120,9 +120,32 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
         upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
       }
 
-      // NOTE: Do NOT emit socket events here.
-      // The backend broadcasts to all other participants automatically after POST /messages.
-      // Any client-side re-emission causes the sender to receive their own message as "incoming".
+      // Emit socket events so the backend broadcasts message:new to the other user
+      const activeSocket = socket || getSocket();
+      if (activeSocket) {
+        const myUserId = user._id || (user as any).id;
+        const socketPayload = {
+          id: realId,
+          _id: realId,
+          conversation: realConvId,
+          conversationId: realConvId,
+          chat: realConvId,
+          sender: myUserId,
+          text: optimisticMsg.text,
+          createdAt: Date.now(),
+        };
+
+        activeSocket.emit('message:new', socketPayload);
+        activeSocket.emit('message', socketPayload);
+        activeSocket.emit('newMessage', socketPayload);
+        activeSocket.emit('new_message', socketPayload);
+        activeSocket.emit('new message', socketPayload);
+        activeSocket.emit('sendMessage', socketPayload);
+        activeSocket.emit('send_message', socketPayload);
+        activeSocket.emit('chat:message', socketPayload);
+        activeSocket.emit('chat message', socketPayload);
+        activeSocket.emit('msg', socketPayload);
+      }
     } catch {
       markMessageFailed(conversationId, id);
       toast.error('Message failed to send. Tap to retry.');

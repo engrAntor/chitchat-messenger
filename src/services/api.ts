@@ -41,8 +41,12 @@ export const usersApi = {
 
 export const conversationsApi = {
   list: async (): Promise<Conversation[]> => {
-    const res = await api.get<Conversation[]>('/conversations');
-    return res.data;
+    const res = await api.get<any>('/conversations');
+    // The backend sometimes wraps it in { data: [...] } and sometimes it might not.
+    if (Array.isArray(res.data)) return res.data;
+    if (res.data && Array.isArray(res.data.data)) return res.data.data;
+    if (res.data && Array.isArray(res.data.conversations)) return res.data.conversations;
+    return [];
   },
 
   startDirect: async (data: StartConversationRequest): Promise<Conversation> => {

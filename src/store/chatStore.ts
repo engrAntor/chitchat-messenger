@@ -47,7 +47,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   setConversations: (convos) =>
     set({
-      conversations: convos.sort(
+      conversations: convos.map(c => {
+        if (c.type === 'direct' && (c as any).participant && !c.participants) {
+          c.participants = [(c as any).participant];
+        }
+        return c;
+      }).sort(
         (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       ),
     }),
@@ -55,6 +60,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   setConversationsStatus: (status) => set({ conversationsStatus: status }),
 
   upsertConversation: (convo) => {
+    if (convo.type === 'direct' && (convo as any).participant && !convo.participants) {
+      convo.participants = [(convo as any).participant];
+    }
     const existing = get().conversations;
     const idx = existing.findIndex((c) => c._id === convo._id);
     if (idx === -1) {
@@ -92,11 +100,49 @@ export const useChatStore = create<ChatState>((set, get) => ({
   appendMessage: (conversationId, message) =>
     set((state) => {
       const existing = state.messages[conversationId] ?? [];
-      // Avoid duplicates
+      // Avoid duplicates by _id
       if (existing.some((m) => m._id === message._id)) return {};
-      return {
-        messages: { ...state.messages, [conversationId]: [...existing, message] },
-      };
+
+      // If this incoming message matches a pending optimistic message, replace it
+      const optimisticIdx = existing.findIndex(
+        (m) =>
+          m.optimistic &&
+          m.status === 'pending' &&
+          m.text === message.text
+      );
+
+      let updatedList: Message[];
+      if (optimisticIdx !== -1) {
+        updatedList = [...existing];
+        updatedList[optimisticIdx] = { ...message, status: 'sent', optimistic: false };
+      } else {
+        updatedList = [...existing, message];
+      }
+
+      // Insert and keep sorted oldest → newest
+      const merged = updatedList.sort(
+        (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      );
+
+      const newMessages = { ...state.messages, [conversationId]: merged };
+
+      // Update the conversation's lastMessage and bubble it to top of sidebar
+      const convoIndex = state.conversations.findIndex((c) => c._id === conversationId);
+      if (convoIndex > -1) {
+        const convo = state.conversations[convoIndex];
+        const updatedConvos = [...state.conversations];
+        updatedConvos[convoIndex] = {
+          ...convo,
+          lastMessage: message,
+          updatedAt: message.createdAt || new Date().toISOString(),
+        };
+        updatedConvos.sort(
+          (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        );
+        return { messages: newMessages, conversations: updatedConvos };
+      }
+
+      return { messages: newMessages };
     }),
 
   replaceOptimisticMessage: (conversationId, tempId, realMessage) =>

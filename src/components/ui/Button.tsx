@@ -11,17 +11,17 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', loading, children, className, disabled, ...props }, ref) => {
     const base =
-      'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none';
+      'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 disabled:cursor-not-allowed select-none cursor-pointer';
 
     const variants = {
       primary:
-        'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-lg shadow-indigo-500/20 focus-visible:outline-indigo-500',
+        'bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white shadow-md shadow-indigo-500/15 hover:shadow-lg hover:shadow-indigo-500/25 focus-visible:outline-indigo-500',
       ghost:
-        'bg-transparent hover:bg-white/8 active:bg-white/12 text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
+        'bg-transparent hover:bg-[var(--surface-hover)] active:bg-[var(--surface-overlay)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
       danger:
-        'bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 hover:text-rose-300 border border-rose-500/20',
+        'bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 dark:text-rose-400 dark:border-rose-500/20',
       outline:
-        'border border-[var(--border-default)] hover:border-[var(--border-strong)] bg-transparent hover:bg-white/4 text-[var(--text-primary)]',
+        'border border-[var(--border-default)] hover:border-[var(--border-strong)] bg-transparent hover:bg-[var(--surface-hover)] text-[var(--text-primary)]',
     };
 
     const sizes = {

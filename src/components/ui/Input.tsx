@@ -27,11 +27,11 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={id}
             className={cn(
-              'w-full h-11 rounded-xl bg-[var(--surface-card)] border border-[var(--border-default)]',
+              'w-full h-11 rounded-xl bg-[var(--surface-muted)] border border-[var(--border-subtle)]',
               'text-sm text-[var(--text-primary)] placeholder:text-[var(--text-muted)]',
-              'transition-all duration-150',
-              'focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20',
-              'hover:border-[var(--border-strong)]',
+              'transition-all duration-200',
+              'focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:bg-[var(--surface-base)]',
+              'hover:border-[var(--border-default)]',
               'disabled:opacity-50 disabled:cursor-not-allowed',
               leftIcon ? 'pl-10' : 'pl-4',
               rightIcon ? 'pr-10' : 'pr-4',
@@ -47,7 +47,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p className="text-xs text-rose-400 flex items-center gap-1">
+          <p className="text-xs text-rose-500 flex items-center gap-1">
             <svg className="w-3 h-3 shrink-0" viewBox="0 0 16 16" fill="currentColor">
               <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3.5a.5.5 0 01.5.5v3a.5.5 0 01-1 0V5a.5.5 0 01.5-.5zm0 6a.75.75 0 110-1.5.75.75 0 010 1.5z" />
             </svg>

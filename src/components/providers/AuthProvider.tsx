@@ -4,7 +4,6 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/services/api';
-import { connectSocket, disconnectSocket } from '@/lib/socket';
 
 export default function AuthProvider({ children }: { children: React.ReactNode }) {
   const { token, setAuth, clearAuth, isHydrated } = useAuthStore();
@@ -22,8 +21,6 @@ export default function AuthProvider({ children }: { children: React.ReactNode }
         setAuth(user, token);
         // Set cookie for middleware
         document.cookie = `chat_token=${token}; path=/; max-age=86400; SameSite=Lax`;
-        // Connect socket
-        connectSocket(token);
       } catch {
         clearAuth();
         document.cookie = 'chat_token=; path=/; max-age=0';

@@ -66,7 +66,7 @@ export default function Modal({ open, onClose, title, children, className, size 
             <button
               id="modal-close-btn"
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/8 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-colors"
               aria-label="Close"
             >
               <X size={16} />

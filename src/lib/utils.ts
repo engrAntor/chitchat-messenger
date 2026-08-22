@@ -49,6 +49,7 @@ export function isDifferentDay(a: string, b: string): boolean {
  * Returns initials from a name (up to 2 chars).
  */
 export function getInitials(name: string): string {
+  if (!name) return '?';
   return name
     .split(' ')
     .slice(0, 2)
@@ -71,6 +72,7 @@ export function getAvatarColor(id: string): string {
     'bg-fuchsia-500',
     'bg-indigo-500',
   ];
+  if (!id) return colors[0];
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
   return colors[Math.abs(hash) % colors.length];

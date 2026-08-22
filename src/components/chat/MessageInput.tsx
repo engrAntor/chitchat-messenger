@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import { useSocketContext } from '@/components/providers/SocketProvider';
+import { getSocket } from '@/lib/socket';
 import { messagesApi } from '@/services/api';
 import { tempId } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -90,40 +91,67 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
 
     try {
       const realMsg = await messagesApi.send({ conversationId, text: optimisticMsg.text });
+      const convo = conversations.find((c) => c._id === conversationId);
       
       const senderObj = (typeof realMsg.sender === 'object' && realMsg.sender?._id)
         ? realMsg.sender
         : { _id: user._id, name: user.name, phone: user.phone };
 
+      const otherParticipants = convo?.participants?.filter((p) => p._id !== user._id) || [];
+      const recipientIds = otherParticipants.map((p) => p._id);
+
       const formattedRealMsg = {
         ...realMsg,
         conversationId: realMsg.conversationId || conversationId,
+        chat: convo || { _id: conversationId },
+        conversation: convo || { _id: conversationId },
+        room: conversationId,
+        roomId: conversationId,
         sender: senderObj,
         status: 'sent' as const,
       };
 
       replaceOptimisticMessage(conversationId, id, formattedRealMsg);
 
-      if (socket) {
-        socket.emit('newMessage', formattedRealMsg);
-        socket.emit('new message', formattedRealMsg);
-        socket.emit('new_message', formattedRealMsg);
-        socket.emit('sendMessage', formattedRealMsg);
-        socket.emit('send_message', formattedRealMsg);
-        socket.emit('send message', formattedRealMsg);
-        socket.emit('message', formattedRealMsg);
-        socket.emit('chat message', formattedRealMsg);
-        socket.emit('chat:message', formattedRealMsg);
-        // Also emit with conversationId / room wrappers
-        socket.emit('newMessage', { conversationId, message: formattedRealMsg });
-        socket.emit('new message', { conversationId, message: formattedRealMsg });
-        socket.emit('sendMessage', { conversationId, message: formattedRealMsg });
-        socket.emit('send_message', { conversationId, message: formattedRealMsg });
-        socket.emit('message', { room: conversationId, message: formattedRealMsg });
+      const activeSocket = socket || getSocket();
+      if (activeSocket) {
+        // 1. Broadcast to conversation / room channel
+        activeSocket.emit('newMessage', formattedRealMsg);
+        activeSocket.emit('new message', formattedRealMsg);
+        activeSocket.emit('new_message', formattedRealMsg);
+        activeSocket.emit('sendMessage', formattedRealMsg);
+        activeSocket.emit('send_message', formattedRealMsg);
+        activeSocket.emit('send message', formattedRealMsg);
+        activeSocket.emit('message', formattedRealMsg);
+        activeSocket.emit('chat message', formattedRealMsg);
+        activeSocket.emit('chat:message', formattedRealMsg);
+
+        // 2. Broadcast with room wrapper object
+        activeSocket.emit('newMessage', { conversationId, message: formattedRealMsg, chat: convo });
+        activeSocket.emit('new message', { conversationId, message: formattedRealMsg, chat: convo });
+        activeSocket.emit('sendMessage', { conversationId, message: formattedRealMsg, chat: convo });
+        activeSocket.emit('send message', { conversationId, message: formattedRealMsg, chat: convo });
+        activeSocket.emit('message', { room: conversationId, message: formattedRealMsg });
+
+        // 3. Direct target emissions to recipient user ID rooms
+        recipientIds.forEach((recId) => {
+          const directPayload = {
+            ...formattedRealMsg,
+            recipient: recId,
+            receiver: recId,
+            to: recId,
+            targetUserId: recId,
+          };
+          activeSocket.emit('newMessage', directPayload);
+          activeSocket.emit('new message', directPayload);
+          activeSocket.emit('sendMessage', directPayload);
+          activeSocket.emit('send message', directPayload);
+          activeSocket.emit('private message', directPayload);
+          activeSocket.emit('private_message', directPayload);
+        });
       }
 
       // Update conversation lastMessage
-      const convo = conversations.find((c) => c._id === conversationId);
       if (convo) {
         upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
       }

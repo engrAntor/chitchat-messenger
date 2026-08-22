@@ -112,14 +112,20 @@ export default function SocketProvider({ children }: { children: React.ReactNode
       const msg = payload.message ?? payload.data ?? payload;
       if (!msg || typeof msg !== 'object') return;
 
+      const getIdStr = (val: any): string => {
+        if (!val) return '';
+        if (typeof val === 'string') return val;
+        return val._id || val.id || val.conversationId || val.chatId || '';
+      };
+
       const convId =
-        msg.conversationId ??
-        (typeof msg.conversation === 'string' ? msg.conversation : msg.conversation?._id) ??
-        msg.chatId ??
-        (typeof msg.chat === 'string' ? msg.chat : msg.chat?._id) ??
-        msg.room ??
-        msg.roomId ??
-        msg.groupId;
+        getIdStr(msg.conversationId) ||
+        getIdStr(msg.conversation) ||
+        getIdStr(msg.chatId) ||
+        getIdStr(msg.chat) ||
+        getIdStr(msg.room) ||
+        getIdStr(msg.roomId) ||
+        getIdStr(msg.groupId);
 
       if (!convId) return;
 

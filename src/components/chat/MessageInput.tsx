@@ -93,68 +93,29 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
       const realMsg = await messagesApi.send({ conversationId, text: optimisticMsg.text });
       const convo = conversations.find((c) => c._id === conversationId);
       
+      // Always ensure sender is the full user object (backend may return just an ID string)
       const senderObj = (typeof realMsg.sender === 'object' && realMsg.sender?._id)
         ? realMsg.sender
         : { _id: user._id, name: user.name, phone: user.phone };
 
-      const otherParticipants = convo?.participants?.filter((p) => p._id !== user._id) || [];
-      const recipientIds = otherParticipants.map((p) => p._id);
-
       const formattedRealMsg = {
         ...realMsg,
         conversationId: realMsg.conversationId || conversationId,
-        chat: convo || { _id: conversationId },
-        conversation: convo || { _id: conversationId },
-        room: conversationId,
-        roomId: conversationId,
         sender: senderObj,
         status: 'sent' as const,
       };
 
+      // Replace the optimistic placeholder with the real confirmed message
       replaceOptimisticMessage(conversationId, id, formattedRealMsg);
 
-      const activeSocket = socket || getSocket();
-      if (activeSocket) {
-        // 1. Broadcast to conversation / room channel
-        activeSocket.emit('newMessage', formattedRealMsg);
-        activeSocket.emit('new message', formattedRealMsg);
-        activeSocket.emit('new_message', formattedRealMsg);
-        activeSocket.emit('sendMessage', formattedRealMsg);
-        activeSocket.emit('send_message', formattedRealMsg);
-        activeSocket.emit('send message', formattedRealMsg);
-        activeSocket.emit('message', formattedRealMsg);
-        activeSocket.emit('chat message', formattedRealMsg);
-        activeSocket.emit('chat:message', formattedRealMsg);
-
-        // 2. Broadcast with room wrapper object
-        activeSocket.emit('newMessage', { conversationId, message: formattedRealMsg, chat: convo });
-        activeSocket.emit('new message', { conversationId, message: formattedRealMsg, chat: convo });
-        activeSocket.emit('sendMessage', { conversationId, message: formattedRealMsg, chat: convo });
-        activeSocket.emit('send message', { conversationId, message: formattedRealMsg, chat: convo });
-        activeSocket.emit('message', { room: conversationId, message: formattedRealMsg });
-
-        // 3. Direct target emissions to recipient user ID rooms
-        recipientIds.forEach((recId) => {
-          const directPayload = {
-            ...formattedRealMsg,
-            recipient: recId,
-            receiver: recId,
-            to: recId,
-            targetUserId: recId,
-          };
-          activeSocket.emit('newMessage', directPayload);
-          activeSocket.emit('new message', directPayload);
-          activeSocket.emit('sendMessage', directPayload);
-          activeSocket.emit('send message', directPayload);
-          activeSocket.emit('private message', directPayload);
-          activeSocket.emit('private_message', directPayload);
-        });
-      }
-
-      // Update conversation lastMessage
+      // Update conversation sidebar with latest message
       if (convo) {
         upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
       }
+
+      // NOTE: Do NOT emit socket events here.
+      // The backend broadcasts to all other participants automatically after POST /messages.
+      // Any client-side re-emission causes the sender to receive their own message as "incoming".
     } catch {
       markMessageFailed(conversationId, id);
       toast.error('Message failed to send. Tap to retry.');

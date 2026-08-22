@@ -106,7 +106,7 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
     const onDisconnect = () => setIsConnected(false);
 
-    // Robust handler for any incoming message event
+    // Incoming message handler — only processes messages from OTHER users
     const onMessage = (payload: any) => {
       if (!payload) return;
       const msg = payload.message ?? payload.data ?? payload;
@@ -131,7 +131,11 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
       const senderId = typeof msg.sender === 'string'
         ? msg.sender
-        : (msg.sender?._id || (msg.sender as any)?.id || msg.senderId || 'unknown');
+        : (msg.sender?._id || (msg.sender as any)?.id || msg.senderId || '');
+
+      // *** KEY FIX: Ignore messages sent by the current user — already in store ***
+      const currentUserId = userRef.current?._id || '';
+      if (currentUserId && senderId && String(senderId) === String(currentUserId)) return;
 
       const foundConvo = storeRef.current.conversations.find((c) => c._id === convId);
       const participant = foundConvo?.participants?.find(
@@ -152,7 +156,7 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
       const normalized = {
         ...msg,
-        _id: msg._id || msg.id || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        _id: msg._id || msg.id || `incoming-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         conversationId: convId,
         sender,
         text: msg.text ?? msg.content ?? msg.message ?? '',
@@ -231,38 +235,11 @@ export default function SocketProvider({ children }: { children: React.ReactNode
     ];
     convoEvents.forEach((ev) => socket.on(ev, onConversation));
 
-    // Catch-all fallback via onAny to handle any custom event name from backend
-    const onAnyEvent = (eventName: string, ...args: any[]) => {
-      const payload = args[0];
-      if (!payload) return;
-      const evLower = eventName.toLowerCase();
-      if (
-        evLower.includes('message') ||
-        evLower.includes('chat') ||
-        evLower.includes('msg') ||
-        payload.text ||
-        payload.content ||
-        payload.message?.text ||
-        payload.message?.content
-      ) {
-        onMessage(payload);
-      } else if (
-        evLower.includes('conversation') ||
-        payload.conversation ||
-        (payload.participants && Array.isArray(payload.participants))
-      ) {
-        onConversation(payload);
-      }
-    };
-
-    socket.onAny(onAnyEvent);
-
     if (socket.connected) onConnect();
 
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
-      socket.offAny(onAnyEvent);
       msgEvents.forEach((ev) => socket.off(ev, onMessage));
       convoEvents.forEach((ev) => socket.off(ev, onConversation));
     };

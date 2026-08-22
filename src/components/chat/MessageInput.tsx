@@ -90,30 +90,42 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
 
     try {
       const realMsg = await messagesApi.send({ conversationId, text: optimisticMsg.text });
-      replaceOptimisticMessage(conversationId, id, { ...realMsg, status: 'sent' });
+      
+      const senderObj = (typeof realMsg.sender === 'object' && realMsg.sender?._id)
+        ? realMsg.sender
+        : { _id: user._id, name: user.name, phone: user.phone };
+
+      const formattedRealMsg = {
+        ...realMsg,
+        conversationId: realMsg.conversationId || conversationId,
+        sender: senderObj,
+        status: 'sent' as const,
+      };
+
+      replaceOptimisticMessage(conversationId, id, formattedRealMsg);
 
       if (socket) {
-        socket.emit('newMessage', realMsg);
-        socket.emit('new message', realMsg);
-        socket.emit('new_message', realMsg);
-        socket.emit('sendMessage', realMsg);
-        socket.emit('send_message', realMsg);
-        socket.emit('send message', realMsg);
-        socket.emit('message', realMsg);
-        socket.emit('chat message', realMsg);
-        socket.emit('chat:message', realMsg);
+        socket.emit('newMessage', formattedRealMsg);
+        socket.emit('new message', formattedRealMsg);
+        socket.emit('new_message', formattedRealMsg);
+        socket.emit('sendMessage', formattedRealMsg);
+        socket.emit('send_message', formattedRealMsg);
+        socket.emit('send message', formattedRealMsg);
+        socket.emit('message', formattedRealMsg);
+        socket.emit('chat message', formattedRealMsg);
+        socket.emit('chat:message', formattedRealMsg);
         // Also emit with conversationId / room wrappers
-        socket.emit('newMessage', { conversationId, message: realMsg });
-        socket.emit('new message', { conversationId, message: realMsg });
-        socket.emit('sendMessage', { conversationId, message: realMsg });
-        socket.emit('send_message', { conversationId, message: realMsg });
-        socket.emit('message', { room: conversationId, message: realMsg });
+        socket.emit('newMessage', { conversationId, message: formattedRealMsg });
+        socket.emit('new message', { conversationId, message: formattedRealMsg });
+        socket.emit('sendMessage', { conversationId, message: formattedRealMsg });
+        socket.emit('send_message', { conversationId, message: formattedRealMsg });
+        socket.emit('message', { room: conversationId, message: formattedRealMsg });
       }
 
       // Update conversation lastMessage
       const convo = conversations.find((c) => c._id === conversationId);
       if (convo) {
-        upsertConversation({ ...convo, lastMessage: realMsg, updatedAt: now });
+        upsertConversation({ ...convo, lastMessage: formattedRealMsg, updatedAt: now });
       }
     } catch {
       markMessageFailed(conversationId, id);

@@ -207,15 +207,21 @@ export default function MessageList({ conversationId }: MessageListProps) {
 
         {/* Messages */}
         {msgs.map((msg, idx) => {
-          const senderId = typeof msg.sender === 'string' ? msg.sender : (msg.sender?._id || (msg.sender as any)?.id);
-          const currentUserId = user?._id || (user as any)?.id;
-          const isOwn = Boolean(currentUserId && senderId === currentUserId);
+          const getId = (val: any): string => {
+            if (!val) return '';
+            if (typeof val === 'string') return val;
+            return val._id || val.id || val.userId || val.senderId || '';
+          };
+
+          const senderId = getId(msg.sender) || getId((msg as any).senderId) || getId((msg as any).userId);
+          const currentUserId = getId(user?._id) || getId((user as any)?.id);
+          const isOwn = Boolean(currentUserId && senderId && String(senderId) === String(currentUserId));
           
           const prevMsg = msgs[idx - 1];
-          const prevSenderId = prevMsg ? (typeof prevMsg.sender === 'string' ? prevMsg.sender : (prevMsg.sender?._id || (prevMsg.sender as any)?.id)) : null;
+          const prevSenderId = prevMsg ? (getId(prevMsg.sender) || getId((prevMsg as any).senderId)) : null;
           
           const nextMsg = msgs[idx + 1];
-          const nextSenderId = nextMsg ? (typeof nextMsg.sender === 'string' ? nextMsg.sender : (nextMsg.sender?._id || (nextMsg.sender as any)?.id)) : null;
+          const nextSenderId = nextMsg ? (getId(nextMsg.sender) || getId((nextMsg as any).senderId)) : null;
 
           const showDateSep = idx === 0 || (prevMsg && isDifferentDay(prevMsg.createdAt, msg.createdAt));
           const showAvatar = !isOwn && (idx === msgs.length - 1 || nextSenderId !== senderId);

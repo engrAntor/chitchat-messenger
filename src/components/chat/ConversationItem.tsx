@@ -1,6 +1,6 @@
 'use client';
 
-import { formatConversationTime, cn, getAvatarColor } from '@/lib/utils';
+import { formatConversationTime, cn, getAvatarColor, getOtherParticipant } from '@/lib/utils';
 import { Conversation } from '@/types';
 import { useAuthStore } from '@/store/authStore';
 import { useChatStore } from '@/store/chatStore';
@@ -20,15 +20,13 @@ export default function ConversationItem({ conversation, isActive, onClick }: Co
   const isGroup = conversation.type === 'group';
   const unread = unreadCounts[conversation._id] ?? 0;
 
-  const otherParticipant = !isGroup
-    ? conversation.participants?.find((p) => p._id !== user?._id) ?? conversation.participants?.[0] ?? (conversation as any).participant
-    : null;
+  const otherParticipant = !isGroup ? getOtherParticipant(conversation, user) : null;
 
   const displayName = isGroup
-    ? conversation.name ?? 'Group Chat'
-    : otherParticipant?.name ?? 'Unknown';
+    ? conversation.name || 'Group Chat'
+    : otherParticipant?.name || 'Chat';
 
-  const displayId = isGroup ? conversation._id : (otherParticipant?._id ?? conversation._id);
+  const displayId = isGroup ? conversation._id : (otherParticipant?._id || conversation._id);
 
   const lastMsg = conversation.lastMessage;
   const lastSenderId = lastMsg

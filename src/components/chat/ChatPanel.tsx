@@ -9,7 +9,7 @@ import MessageList from './MessageList';
 import MessageInput from './MessageInput';
 import GroupInfoPanel from './GroupInfoPanel';
 import EmptyState from '@/components/ui/EmptyState';
-import { getAvatarColor } from '@/lib/utils';
+import { getAvatarColor, getOtherParticipant } from '@/lib/utils';
 
 export default function ChatPanel() {
   const { user } = useAuthStore();
@@ -31,19 +31,17 @@ export default function ChatPanel() {
   }
 
   const isGroup = conversation.type === 'group';
-  const otherParticipant = !isGroup
-    ? conversation.participants?.find((p) => p._id !== user?._id) ?? conversation.participants?.[0] ?? (conversation as any).participant
-    : null;
+  const otherParticipant = !isGroup ? getOtherParticipant(conversation, user) : null;
 
   const displayName = isGroup
-    ? conversation.name ?? 'Group Chat'
-    : otherParticipant?.name ?? 'Unknown';
+    ? conversation.name || 'Group Chat'
+    : otherParticipant?.name || 'Chat';
 
-  const displayId = isGroup ? conversation._id : (otherParticipant?._id ?? conversation._id);
+  const displayId = isGroup ? conversation._id : (otherParticipant?._id || conversation._id);
 
   const subtitle = isGroup
     ? `${conversation.participants?.length ?? 0} members`
-    : otherParticipant?.phone ?? '';
+    : otherParticipant?.phone || '';
 
   return (
     <div className="flex-1 flex min-w-0 overflow-hidden">

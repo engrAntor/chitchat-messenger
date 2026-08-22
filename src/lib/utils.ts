@@ -91,3 +91,64 @@ export function relativeTime(dateStr: string): string {
 export function tempId(): string {
   return `temp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 }
+
+/**
+ * Extracts the other participant in a direct conversation.
+ */
+export function getOtherParticipant(
+  convo: import('@/types').Conversation | undefined | null,
+  currentUser: import('@/types').User | null
+): { _id: string; name: string; phone: string } | null {
+  if (!convo || convo.type === 'group') return null;
+
+  const currentId = currentUser?._id || (currentUser as any)?.id || (currentUser as any)?.user?._id || '';
+  const currentPhone = currentUser?.phone?.trim() || (currentUser as any)?.user?.phone?.trim() || '';
+
+  const rawParticipants = Array.isArray(convo.participants) ? convo.participants : [];
+
+  // 1. Try finding a participant whose ID and Phone do NOT match current user
+  let other = rawParticipants.find((p: any) => {
+    if (!p) return false;
+    const pId = typeof p === 'string' ? p : (p._id || p.id || p.user?._id);
+    const pPhone = typeof p === 'object' ? (p.phone || p.user?.phone)?.trim() : '';
+
+    if (currentId && pId && String(pId) === String(currentId)) return false;
+    if (currentPhone && pPhone && pPhone === currentPhone) return false;
+    return true;
+  });
+
+  // 2. If not found, check (convo as any).participant / recipient / otherUser
+  if (!other) {
+    other = (convo as any).participant || (convo as any).recipient || (convo as any).otherUser || (convo as any).user;
+  }
+
+  // 3. If still not found, take first participant
+  if (!other && rawParticipants.length > 0) {
+    other = rawParticipants[0];
+  }
+
+  if (other) {
+    if (typeof other === 'string') {
+      return { _id: other, name: 'User', phone: '' };
+    }
+    const inner = (other as any).user ?? other;
+    const id = inner._id || inner.id || convo._id;
+    const phone = inner.phone?.trim() || '';
+    const rawName = inner.name?.trim();
+    const name = (rawName && rawName.toLowerCase() !== 'unknown' && rawName.toLowerCase() !== 'user')
+      ? rawName
+      : phone || 'User';
+
+    return {
+      _id: id,
+      name,
+      phone,
+    };
+  }
+
+  return {
+    _id: convo._id,
+    name: 'User',
+    phone: '',
+  };
+}

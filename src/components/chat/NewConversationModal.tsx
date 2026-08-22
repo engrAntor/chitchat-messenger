@@ -79,17 +79,33 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
     setCreating(true);
     try {
       const convo = await conversationsApi.startDirect({ userId: targetUser._id });
-      upsertConversation(convo);
-      setActiveConversation(convo._id);
-      clearUnread(convo._id);
+      
+      const existing = Array.isArray(convo.participants) ? convo.participants : [];
+      const currentU = user ? { _id: user._id, name: user.name, phone: user.phone } : null;
+      const targetP = { _id: targetUser._id, name: targetUser.name, phone: targetUser.phone };
+      
+      const merged = [
+        targetP,
+        ...(currentU ? [currentU] : []),
+        ...existing.filter((p: any) => p && typeof p === 'object' && p._id !== targetUser._id && p._id !== user?._id),
+      ];
+
+      const fullConvo = {
+        ...convo,
+        participants: merged,
+      };
+
+      upsertConversation(fullConvo);
+      setActiveConversation(fullConvo._id);
+      clearUnread(fullConvo._id);
 
       if (socket) {
-        socket.emit('join', convo._id);
-        socket.emit('join_room', convo._id);
-        socket.emit('join chat', convo._id);
-        socket.emit('newConversation', convo);
-        socket.emit('new_conversation', convo);
-        socket.emit('conversation:new', convo);
+        socket.emit('join', fullConvo._id);
+        socket.emit('join_room', fullConvo._id);
+        socket.emit('join chat', fullConvo._id);
+        socket.emit('newConversation', fullConvo);
+        socket.emit('new_conversation', fullConvo);
+        socket.emit('conversation:new', fullConvo);
       }
 
       onClose();

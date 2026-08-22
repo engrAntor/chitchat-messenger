@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Plus, Search, MessageSquare, LogOut, Wifi, WifiOff } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getOtherParticipant } from '@/lib/utils';
 import { useChatStore } from '@/store/chatStore';
 import { useAuthStore } from '@/store/authStore';
 import { conversationsApi } from '@/services/api';
@@ -50,7 +50,7 @@ export default function ConversationList() {
     const q = search.toLowerCase();
     if (!q) return true;
     if (c.type === 'group') return c.name?.toLowerCase().includes(q);
-    const other = c.participants?.find((p) => p._id !== user?._id) ?? (c as any).participant;
+    const other = getOtherParticipant(c, user);
     return other?.name.toLowerCase().includes(q) || other?.phone.includes(q);
   });
 

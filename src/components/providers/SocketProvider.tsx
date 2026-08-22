@@ -153,15 +153,16 @@ export default function SocketProvider({ children }: { children: React.ReactNode
       ) ?? (foundConvo as any)?.participant;
 
       const rawSenderName = typeof msg.sender === 'object' ? msg.sender?.name : undefined;
+      const rawSenderPhone = typeof msg.sender === 'object' ? msg.sender?.phone : undefined;
       const resolvedSenderName =
-        (rawSenderName && rawSenderName !== 'User')
+        (rawSenderName && rawSenderName.toLowerCase() !== 'user' && rawSenderName.toLowerCase() !== 'unknown')
           ? rawSenderName
-          : participant?.name || msg.senderName || msg.name || 'User';
+          : participant?.name || participant?.phone || rawSenderPhone || msg.senderName || msg.name || 'User';
 
       const sender = {
         _id: senderId,
         name: resolvedSenderName,
-        phone: (typeof msg.sender === 'object' ? msg.sender?.phone : null) || participant?.phone || msg.senderPhone || msg.phone || '',
+        phone: rawSenderPhone || participant?.phone || msg.senderPhone || msg.phone || '',
       };
 
       const normalized = {

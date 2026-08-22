@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { formatMessageTime, formatDateSeparator, isDifferentDay, cn } from '@/lib/utils';
+import { formatMessageTime, formatDateSeparator, isDifferentDay, cn, getOtherParticipant } from '@/lib/utils';
 import { Message } from '@/types';
 import Avatar from '@/components/ui/Avatar';
 import Spinner from '@/components/ui/Spinner';
@@ -329,21 +329,27 @@ function MessageBubble({
   );
 
   // In direct chats, the other participant is the one who is NOT current user
-  const otherParticipant = conversation?.type === 'direct'
-    ? conversation.participants?.find(
-        (p) =>
-          (currentId && p._id && String(p._id) !== String(currentId)) ||
-          (currentPhone && p.phone && p.phone.trim() !== currentPhone)
-      ) ?? (conversation as any)?.participant
-    : null;
+  const otherParticipant = conversation?.type === 'direct' ? getOtherParticipant(conversation, user) : null;
 
   const rawName = typeof rawSender === 'object' ? rawSender?.name : undefined;
 
   // Resolve sender name
-  const resolvedName =
-    (rawName && rawName.trim() !== '' && rawName !== 'User')
-      ? rawName
-      : participant?.name || (conversation?.type === 'direct' ? otherParticipant?.name : null) || (typeof rawSender === 'object' ? rawSender?.phone : null) || 'User';
+  let resolvedName = '';
+  if (rawName && rawName.trim() !== '' && rawName.toLowerCase() !== 'user' && rawName.toLowerCase() !== 'unknown') {
+    resolvedName = rawName;
+  } else if (participant?.name && participant.name.trim() !== '' && participant.name.toLowerCase() !== 'user' && participant.name.toLowerCase() !== 'unknown') {
+    resolvedName = participant.name;
+  } else if (participant?.phone) {
+    resolvedName = participant.phone;
+  } else if (conversation?.type === 'direct' && otherParticipant?.name && otherParticipant.name.toLowerCase() !== 'user' && otherParticipant.name.toLowerCase() !== 'unknown') {
+    resolvedName = otherParticipant.name;
+  } else if (conversation?.type === 'direct' && otherParticipant?.phone) {
+    resolvedName = otherParticipant.phone;
+  } else if (typeof rawSender === 'object' && rawSender?.phone) {
+    resolvedName = rawSender.phone;
+  } else {
+    resolvedName = otherParticipant?.name || otherParticipant?.phone || 'User';
+  }
 
   const senderName = isOwn ? 'You' : resolvedName;
 

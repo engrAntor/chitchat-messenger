@@ -93,14 +93,21 @@ export default function MessageInput({ conversationId }: MessageInputProps) {
       const realMsg = await messagesApi.send({ conversationId, text: optimisticMsg.text });
       const convo = conversations.find((c) => c._id === conversationId);
       
-      // Always ensure sender is the full user object (backend may return just an ID string)
+      // Server returns 'sender' as a plain string ID — expand it to full user object
       const senderObj = (typeof realMsg.sender === 'object' && realMsg.sender?._id)
         ? realMsg.sender
         : { _id: user._id, name: user.name, phone: user.phone };
 
+      // Server returns 'id' (not '_id') and 'conversation' (not 'conversationId')
+      const realId = (realMsg as any)._id || (realMsg as any).id;
+      const realConvId = (realMsg as any).conversationId
+        || (realMsg as any).conversation
+        || conversationId;
+
       const formattedRealMsg = {
         ...realMsg,
-        conversationId: realMsg.conversationId || conversationId,
+        _id: realId,
+        conversationId: realConvId,
         sender: senderObj,
         status: 'sent' as const,
       };

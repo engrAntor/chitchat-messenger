@@ -180,11 +180,15 @@ export default function SocketProvider({ children }: { children: React.ReactNode
 
       const normalized = {
         ...msg,
+        // Server returns 'id' not '_id'
         _id: msg._id || msg.id || `incoming-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         conversationId: convId,
         sender,
         text: msg.text ?? msg.content ?? msg.message ?? '',
-        createdAt: msg.createdAt || new Date().toISOString(),
+        // Server returns Unix timestamp number — convert to ISO string
+        createdAt: typeof msg.createdAt === 'number'
+          ? new Date(msg.createdAt).toISOString()
+          : (msg.createdAt || new Date().toISOString()),
         status: 'sent',
       };
 

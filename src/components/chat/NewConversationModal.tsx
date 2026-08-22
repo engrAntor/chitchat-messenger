@@ -121,8 +121,8 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
       toast.error('Group name is required');
       return;
     }
-    if (selected.length < 2) {
-      toast.error('Select at least 2 members for a group');
+    if (selected.length < 1) {
+      toast.error('Select at least 1 member to create a group');
       return;
     }
     setCreating(true);
@@ -146,7 +146,8 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
 
       toast.success(`Group "${groupName}" created!`);
       onClose();
-    } catch {
+    } catch (err) {
+      console.error('[createGroup] error:', err);
       toast.error('Failed to create group');
     } finally {
       setCreating(false);
@@ -287,15 +288,15 @@ export default function NewConversationModal({ open, onClose }: NewConversationM
             id="create-group-btn"
             className="w-full"
             loading={creating}
-            disabled={selected.length < 2 || !groupName.trim()}
+            disabled={selected.length < 1 || !groupName.trim()}
             onClick={handleCreateGroup}
           >
             <Users size={16} />
-            Create Group ({selected.length + 1} members)
+            Create Group ({selected.length + 1} member{selected.length + 1 !== 1 ? 's' : ''})
           </Button>
-          {selected.length < 2 && (
+          {selected.length < 1 && (
             <p className="text-center text-xs text-[var(--text-muted)] mt-2">
-              Select at least 2 people to create a group
+              Select at least 1 person to create a group
             </p>
           )}
         </div>
